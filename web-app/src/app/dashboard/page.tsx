@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import CreateProjectModal from "@/components/CreateProjectModal";
 
-export default function HomePage() {
+export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
