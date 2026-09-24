@@ -42,22 +42,25 @@ export default function DashboardPage() {
         }`}
       >
         <div>
-          {/* Header do Logo Planner */}
-          <div className="h-16 flex items-center px-4 border-b border-gray-100 overflow-hidden">
-            <div className="w-8 h-8 shrink-0 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-lg leading-none">P</span>
+          {/* Header do Logo Planner (Padding rigorosamente padronizado com os itens de navegação) */}
+          <div className="h-16 flex items-center px-3 border-b border-gray-100 overflow-hidden shrink-0">
+            <div className="flex items-center w-full px-3">
+              {/* Caixa do Logo "P" com dimensões fixas (32x32px), perfeitamente centrada no eixo dos ícones */}
+              <div className="w-8 h-8 shrink-0 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                <span className="text-white font-bold text-lg leading-none">P</span>
+              </div>
+              
+              {/* Texto do Logo mantido no DOM com fade suave */}
+              <span
+                className={`ml-3 font-bold text-xl tracking-tight text-gray-900 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                  isSidebarOpen
+                    ? "opacity-100 translate-x-0"
+                    : "opacity-0 -translate-x-2 pointer-events-none"
+                }`}
+              >
+                Planner
+              </span>
             </div>
-            
-            {/* Texto do Logo mantido no DOM com fade suave */}
-            <span
-              className={`ml-3 font-bold text-xl tracking-tight text-gray-900 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
-                isSidebarOpen
-                  ? "opacity-100 translate-x-0"
-                  : "opacity-0 -translate-x-2 pointer-events-none"
-              }`}
-            >
-              Planner
-            </span>
           </div>
           
           {/* Links de Navegação */}
