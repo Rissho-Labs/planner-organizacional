@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { 
   Home, 
   LayoutTemplate, 
@@ -16,9 +19,50 @@ import {
 } from "lucide-react";
 import CreateProjectModal from "@/components/CreateProjectModal";
 
+export interface Project {
+  id: string;
+  title: string;
+  type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createdAt: any;
+}
+
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // Estados
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Conexão em Tempo Real com Firestore
+  useEffect(() => {
+    const projectsRef = collection(db, "projects");
+    const q = query(projectsRef, orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedProjects: Project[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title || "Projeto sem título",
+            type: data.type || "Geral",
+            createdAt: data.createdAt,
+          };
+        });
+        setProjects(fetchedProjects);
+      },
+      (error) => {
+        console.error("Erro ao escutar projetos em tempo real:", error);
+      }
+    );
+
+    // Limpa o listener ao desmontar o componente
+    return () => unsubscribe();
+  }, []);
 
   const navItems = [
     { label: "Início", icon: Home, active: true },
@@ -32,6 +76,15 @@ export default function DashboardPage() {
     { label: "Sair", icon: LogOut, isDanger: true },
   ];
 
+  const filteredProjects = projects.filter((project) => {
+    if (!searchQuery.trim()) return true;
+    const term = searchQuery.toLowerCase();
+    return (
+      project.title.toLowerCase().includes(term) ||
+      project.type.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans overflow-hidden select-none">
       
@@ -42,7 +95,7 @@ export default function DashboardPage() {
         }`}
       >
         <div>
-          {/* Header do Logo Planner (Padding rigorosamente padronizado com os itens de navegação) */}
+          {/* Header do Logo Planner (Padding padronizado com os itens de navegação) */}
           <div className="h-16 flex items-center px-3 border-b border-gray-100 overflow-hidden shrink-0">
             <div className="flex items-center w-full px-3">
               {/* Caixa do Logo "P" com dimensões fixas (32x32px), perfeitamente centrada no eixo dos ícones */}
@@ -190,6 +243,8 @@ export default function DashboardPage() {
               <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Pesquisar templates ou projetos..." 
                 className="w-full pl-10 pr-4 py-2 bg-gray-100 border-transparent rounded-lg focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none"
               />
@@ -199,6 +254,7 @@ export default function DashboardPage() {
           <div className="flex items-center ml-4">
             <div className="w-10 h-10 bg-gray-300 rounded-full border-2 border-white shadow-sm overflow-hidden shrink-0">
               {/* Avatar Placeholder */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Chief" alt="Avatar" />
             </div>
           </div>
@@ -232,32 +288,39 @@ export default function DashboardPage() {
               <span className="text-white font-medium">Criar Novo Projeto</span>
             </div>
 
-            {/* Card Mockup 1 */}
-            <div className="group cursor-pointer bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all overflow-hidden flex flex-col">
-              <div className="h-32 bg-gray-800 relative">
-                {/* Imagem de Capa Placeholder */}
-                <div className="absolute top-2 right-2 p-1 bg-white/10 hover:bg-white/30 rounded-md backdrop-blur-sm transition-colors">
-                  <MoreHorizontal className="w-5 h-5 text-white" />
+            {/* Cards Dinâmicos do Firebase Firestore */}
+            {filteredProjects.map((project) => (
+              <div
+                key={project.id}
+                onClick={() => router.push('/editor/project/' + project.id)}
+                className="group cursor-pointer bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all overflow-hidden flex flex-col transform hover:-translate-y-0.5"
+              >
+                <div className="h-32 bg-gradient-to-br from-slate-800 to-indigo-950 relative flex items-center justify-center p-4">
+                  {/* Badge visual do Tipo de Formato */}
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-white/10 backdrop-blur-md rounded-lg text-white/90 border border-white/10">
+                    {project.type}
+                  </span>
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    className="absolute top-2 right-2 p-1 bg-black/20 hover:bg-black/40 rounded-md backdrop-blur-sm transition-colors text-white"
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                      {project.title}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {project.type}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="p-4 flex-1">
-                <h3 className="font-semibold text-gray-900">Retiro de Jovens 2026</h3>
-                <p className="text-xs text-gray-500 mt-1">Editado há 2 horas</p>
-              </div>
-            </div>
-
-            {/* Card Mockup 2 */}
-            <div className="group cursor-pointer bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all overflow-hidden flex flex-col">
-              <div className="h-32 bg-orange-100 relative">
-                <div className="absolute top-2 right-2 p-1 bg-black/5 hover:bg-black/10 rounded-md transition-colors">
-                  <MoreHorizontal className="w-5 h-5 text-gray-700" />
-                </div>
-              </div>
-              <div className="p-4 flex-1">
-                <h3 className="font-semibold text-gray-900">Festa de Halloween</h3>
-                <p className="text-xs text-gray-500 mt-1">Editado ontem</p>
-              </div>
-            </div>
+            ))}
 
           </div>
         </div>

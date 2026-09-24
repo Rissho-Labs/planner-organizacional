@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { getProject, updateProjectTitle } from "../../../../lib/projects";
 import {
   ArrowLeft,
   Share2,
@@ -28,11 +30,43 @@ type ToolType = "select" | "text" | "image" | "square" | "circle";
 
 export default function EditorLayout({
   children,
-  params,
 }: EditorLayoutProps) {
+  const params = useParams() as { id: string };
   const [activeTool, setActiveTool] = useState<ToolType>("select");
-  const [projectName, setProjectName] = useState("Meu Novo Projeto");
+  const [title, setTitle] = useState("Meu Novo Projeto");
+  const [saveStatus, setSaveStatus] = useState("Salvo");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (params.id) {
+      getProject(params.id).then((project) => {
+        if (project && project.title) {
+          setTitle(project.title);
+        }
+      });
+    }
+  }, [params.id]);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    setSaveStatus("Salvando...");
+
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    debounceTimer.current = setTimeout(async () => {
+      try {
+        await updateProjectTitle(params.id, newTitle);
+        setSaveStatus("Salvo");
+      } catch (error) {
+        setSaveStatus("Erro");
+      }
+    }, 1000);
+  };
 
   const tools: {
     id: ToolType;
@@ -82,13 +116,13 @@ export default function EditorLayout({
           <div className="flex items-center space-x-2">
             <input
               type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
+              value={title}
+              onChange={handleTitleChange}
               className="text-sm font-semibold text-gray-800 bg-transparent hover:bg-gray-50 focus:bg-white px-2 py-1 rounded-md border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none max-w-[140px] sm:max-w-[240px] truncate"
               title={`Projeto #${params.id} - Clique para renomear`}
             />
-            <span className="flex items-center text-[11px] text-gray-400 font-medium hidden sm:flex">
-              <Cloud className="w-3.5 h-3.5 mr-1 text-emerald-500 inline" /> Salvo
+            <span className={`flex items-center text-[11px] font-medium hidden sm:flex ${saveStatus === 'Erro' ? 'text-red-500' : 'text-gray-400'}`}>
+              <Cloud className={`w-3.5 h-3.5 mr-1 inline ${saveStatus === 'Salvo' ? 'text-emerald-500' : saveStatus === 'Erro' ? 'text-red-500' : 'text-gray-400'}`} /> {saveStatus}
             </span>
           </div>
         </div>
