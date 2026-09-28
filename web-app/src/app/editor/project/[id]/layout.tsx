@@ -18,7 +18,6 @@ import {
   Cloud,
   ChevronLeft,
   ChevronRight,
-  Menu
 } from "lucide-react";
 
 interface EditorLayoutProps {
@@ -148,7 +147,7 @@ export default function EditorLayout({ children }: EditorLayoutProps) {
   useEffect(() => {
     if (params.id) {
       // Adicionamos a tipagem "any" (ou flexível) para o TypeScript aceitar os campos do Firebase
-      getProject(params.id).then((project: any) => {
+      getProject(params.id).then((project) => {
         if (project && project.title) {
           setTitle(project.title);
         }
@@ -171,7 +170,7 @@ export default function EditorLayout({ children }: EditorLayoutProps) {
       try {
         await updateProjectTitle(params.id, newTitle);
         setSaveStatus("Salvo");
-      } catch (error) {
+      } catch {  // <-- Remova o (_error) daqui
         setSaveStatus("Erro");
       }
     }, 1000);

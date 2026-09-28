@@ -4,6 +4,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createProject } from "../lib/projects";
 import {
+  FALLBACK_IMPORT_SIZE,
+  FORMAT_CANVAS_SIZE,
+  customCanvasSize,
+  type CanvasSize,
+} from "../lib/formats";
+import {
   X,
   Search,
   SlidersHorizontal,
@@ -30,6 +36,7 @@ export interface FormatOption {
   color: string;
   badge?: string;
   dimensions?: string;
+  canvasSize: CanvasSize;
 }
 
 export interface CreateProjectModalProps {
@@ -48,6 +55,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     color: "from-blue-500 to-indigo-600",
     badge: "Popular",
     dimensions: "Sem limites",
+    canvasSize: FORMAT_CANVAS_SIZE["infinite-canvas"],
   },
   {
     id: "a4-report",
@@ -58,6 +66,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     color: "from-emerald-500 to-teal-600",
     badge: "A4",
     dimensions: "210 × 297 mm",
+    canvasSize: FORMAT_CANVAS_SIZE["a4-report"],
   },
   {
     id: "presentation",
@@ -68,6 +77,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     color: "from-amber-500 to-orange-600",
     badge: "16:9",
     dimensions: "1920 × 1080 px",
+    canvasSize: FORMAT_CANVAS_SIZE.presentation,
   },
   {
     id: "whiteboard",
@@ -77,6 +87,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     icon: LayoutDashboard,
     color: "from-purple-500 to-violet-600",
     dimensions: "Flexível",
+    canvasSize: FORMAT_CANVAS_SIZE.whiteboard,
   },
   {
     id: "social-post",
@@ -87,6 +98,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     color: "from-pink-500 to-rose-600",
     badge: "1:1",
     dimensions: "1080 × 1080 px",
+    canvasSize: FORMAT_CANVAS_SIZE["social-post"],
   },
   {
     id: "weekly-planner",
@@ -96,6 +108,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     icon: Calendar,
     color: "from-cyan-500 to-blue-600",
     dimensions: "Organizador",
+    canvasSize: FORMAT_CANVAS_SIZE["weekly-planner"],
   },
   {
     id: "workflow-diagram",
@@ -105,6 +118,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     icon: Workflow,
     color: "from-violet-500 to-fuchsia-600",
     dimensions: "Fluxograma",
+    canvasSize: FORMAT_CANVAS_SIZE["workflow-diagram"],
   },
   {
     id: "web-banner",
@@ -114,6 +128,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     icon: Sparkles,
     color: "from-rose-500 to-red-600",
     dimensions: "1200 × 630 px",
+    canvasSize: FORMAT_CANVAS_SIZE["web-banner"],
   },
 ];
 
@@ -166,23 +181,22 @@ export default function CreateProjectModal({
   const categories = ["Todos", "Geral", "Documentos", "Apresentações", "Colaboração", "Produtividade"];
 
   // Função assíncrona principal de criação e roteamento
-  const handleCreate = async (type: string) => {
+  const handleCreate = async (type: string, size?: CanvasSize) => {
     if (isLoading) return;
 
-    // Valida se o título foi informado; caso contrário, define título padrão
     const projectTitle = title.trim() ? title.trim() : "Projeto sem título";
     setIsLoading(true);
 
     try {
-      if (onSelectFormat) {
-        const selectedFormat = FORMAT_OPTIONS.find((f) => f.title === type);
-        if (selectedFormat) {
-          onSelectFormat(selectedFormat);
-        }
+      const selectedFormat = FORMAT_OPTIONS.find((f) => f.title === type);
+      if (onSelectFormat && selectedFormat) {
+        onSelectFormat(selectedFormat);
       }
 
-      const projectId = await createProject(projectTitle, type);
-      router.push('/editor/project/' + projectId);
+      const canvasSize =
+        size ?? selectedFormat?.canvasSize ?? FALLBACK_IMPORT_SIZE;
+      const projectId = await createProject(projectTitle, type, canvasSize);
+      router.push("/editor/project/" + projectId);
     } catch (error) {
       console.error("Erro ao criar projeto:", error);
     } finally {
@@ -219,7 +233,10 @@ export default function CreateProjectModal({
   const handleCustomSizeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    await handleCreate(`Personalizado (${customWidth} × ${customHeight} ${customUnit})`);
+    await handleCreate(
+      `Personalizado (${customWidth} × ${customHeight} ${customUnit})`,
+      customCanvasSize(Number(customWidth), Number(customHeight), customUnit)
+    );
   };
 
   const handleFileImportClick = () => {
@@ -232,7 +249,7 @@ export default function CreateProjectModal({
     if (file && !isLoading) {
       const importedTitle = file.name.replace(/\.[^/.]+$/, "");
       setTitle(importedTitle);
-      await handleCreate("Arquivo Importado");
+      await handleCreate("Arquivo Importado", FALLBACK_IMPORT_SIZE);
     }
   };
 
