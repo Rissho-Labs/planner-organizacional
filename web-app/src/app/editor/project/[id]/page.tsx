@@ -23,6 +23,7 @@ export default function EditorPage() {
   const [artboard, setArtboard] = useState<{ width: number; height: number; json: CanvasJson | null } | null>(null);
 
   const canvasInstance = useRef<fabric.Canvas | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; visible: boolean } | null>(null);
   const isHydrating = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,12 +74,25 @@ export default function EditorPage() {
         setToolbarPos({ x: 0, y: 0 });
         return;
       }
-      const rect = obj.getBoundingRect();
+
+      // Ensure object's coordinates are up‑to‑date
+      obj.setCoords();
+      const aCoords = obj.aCoords;
+      if (!aCoords) {
+        setToolbarPos({ x: 0, y: 0 });
+        return;
+      }
+
+      // Calculate top‑center point in canvas pixels
+      const topCenterX = (aCoords.tl.x + aCoords.tr.x) / 2;
+      const topCenterY = Math.min(aCoords.tl.y, aCoords.tr.y);
+
+      // Convert to screen coordinates relative to the wrapper element
       const wrapperRect = canvas.wrapperEl.getBoundingClientRect();
-      setToolbarPos({
-        x: wrapperRect.left + rect.left + rect.width / 2,
-        y: wrapperRect.top + rect.top - 15, // Mais espaço entre o botão e o objeto
-      });
+      const x = wrapperRect.left + topCenterX;
+      const y = wrapperRect.top + topCenterY - 12; // 12px above the object
+
+      setToolbarPos({ x, y });
     };
 
     canvas.on("selection:created", (e) => {
@@ -123,6 +137,33 @@ export default function EditorPage() {
       });
     });
 
+      // Right‑click context menu handling
+      canvas.on("mouse:down", (opt) => {
+        const e = opt.e as MouseEvent;
+        if (e.button === 2) { // right click
+          e.preventDefault();
+          if (opt.target) {
+            canvas.setActiveObject(opt.target);
+            setSelectedObject(opt.target as fabric.Object);
+          } else {
+            canvas.discardActiveObject();
+            setSelectedObject(null);
+          }
+          setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+        }
+      });
+
+      const handleWindowClick = () => setContextMenu(null);
+      window.addEventListener("click", handleWindowClick);
+
+      // Cleanup additional listeners
+      const originalCleanup = canvas.off;
+      canvas.on("selection:cleared", () => {
+        setSelectedObject(null);
+        setToolbarPos({ x: 0, y: 0 });
+        setContextMenu(null);
+      });
+
     const persistCanvas = () => {
       if (isHydrating.current || !canvasInstance.current) return;
       void updateProjectCanvas(projectId, serializeCanvas(canvasInstance.current), {
@@ -153,6 +194,7 @@ export default function EditorPage() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       canvas.off(); // Limpa todos os eventos do canvas
+        window.removeEventListener("click", handleWindowClick);
       if (!isHydrating.current && canvasInstance.current) persistCanvas();
       canvas.dispose();
       setCanvas(null);
@@ -220,6 +262,26 @@ export default function EditorPage() {
     setToolbarPos(prev => ({ ...prev }));
   };
 
+  const handleBringToFront = () => {
+    const canvas = canvasInstance.current;
+    const activeObject = canvas?.getActiveObject();
+    if (canvas && activeObject) {
+      canvas.bringObjectToFront(activeObject);
+      canvas.requestRenderAll();
+    }
+    setContextMenu(null);
+  };
+
+  const handleSendToBack = () => {
+    const canvas = canvasInstance.current;
+    const activeObject = canvas?.getActiveObject();
+    if (canvas && activeObject) {
+      canvas.sendObjectToBack(activeObject);
+      canvas.requestRenderAll();
+    }
+    setContextMenu(null);
+  };
+
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden bg-gray-100" data-project-id={projectId}>
       {/* Container flexível seguro (evita corte no topo) */}
@@ -264,6 +326,49 @@ export default function EditorPage() {
           <button type="button" onClick={handleDelete} title="Excluir" className="p-1.5 hover:bg-red-500/80 hover:text-white rounded-md transition-colors"><Trash2 className="w-4 h-4 text-white" /></button>
         </div>
       )}
+
+        {contextMenu?.visible && (
+          <div
+            className="absolute z-40 bg-black/80 backdrop-blur-md rounded-md shadow-lg p-2 flex flex-col space-y-1"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              className="text-white hover:bg-white/10 rounded px-2 py-1 text-sm"
+            >
+              Duplicar
+            </button>
+            <button
+              type="button"
+              onClick={handleBringToFront}
+              className="text-white hover:bg-white/10 rounded px-2 py-1 text-sm"
+            >
+              Trazer para Frente
+            </button>
+            <button
+              type="button"
+              onClick={handleSendToBack}
+              className="text-white hover:bg-white/10 rounded px-2 py-1 text-sm"
+            >
+              Enviar para Trás
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleLock}
+              className="text-white hover:bg-white/10 rounded px-2 py-1 text-sm"
+            >
+              Bloquear / Desbloquear
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="text-red-400 hover:bg-red-500/20 rounded px-2 py-1 text-sm"
+            >
+              Excluir
+            </button>
+          </div>
+        )}
     </div>
   );
 }
